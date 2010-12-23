@@ -44,12 +44,15 @@ class Crowd
 
     # run ruby with -d to see SOAP wiredumps.
     @server.wiredump_dev = STDERR if $DEBUG or @debug
+
     
+    load_cache
     if( @@server_token_cache[crowd_server_url] == nil ) 
       
       # first app login.. 
       authenticate_application @configuration['application_name'], @configuration['application_password']
       @@server_token_cache[crowd_server_url] = @server_token
+      store_cache
       
     else
       # we have a cached app token, lets see if it still works...
@@ -61,13 +64,36 @@ class Crowd
         # token is not valid anymore.. invalidate cached entry
         @@server_token_cache[crowd_server_url] = nil
         @server_token = nil
+        store_cache
+        
         # and ge a new token...
         authenticate_application @configuration['application_name'], @configuration['application_password']
         @@server_token_cache[crowd_server_url] = @server_token
+        store_cache
       end
     end
 
   end  
+  
+  def load_cache()
+    cache_file =  @configuration['cache_file']
+    if( cache_file )
+      if( File.exist?(cache_file) )
+        @@server_token_cache = YAML::load(IO.read(cache_file)) if cache_file
+      else
+        @@server_token_cache = {}
+      end
+    end
+  end
+  
+  def store_cache()
+    cache_file =  @configuration['cache_file']
+    if( cache_file )
+      File.open(  cache_file, 'w' ) do |out|
+        YAML.dump( @@server_token_cache, out )
+      end
+    end
+  end
   
   def get_domain()
     @server.getDomain(GetDomain.new(@server_token)).out
