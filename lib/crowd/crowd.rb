@@ -38,6 +38,7 @@ class Crowd
     
     crowd_server_url = @configuration['crowd_server_url']
     @server = SecurityServerPortType.new(crowd_server_url)
+    @server.options["protocol.http.ssl_config.verify_mode"] = OpenSSL::SSL::VERIFY_NONE
 
     # run ruby with -d to see SOAP wiredumps.
     @server.wiredump_dev = STDERR if $DEBUG or @debug
