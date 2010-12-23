@@ -25,6 +25,8 @@ require 'crowd/defaultDriver.rb'
 #-- TODO Should this be a module rather than a class?
 class Crowd
   
+  @@server_token_cache = {}
+  
   # testing only
   # attr_reader :server, :server_token
   
@@ -42,19 +44,35 @@ class Crowd
 
     # run ruby with -d to see SOAP wiredumps.
     @server.wiredump_dev = STDERR if $DEBUG or @debug
-
-#    retries = 0
-#    begin
-      authenticate_application @configuration['application_name'], @configuration['application_password']
-#    rescue SOAP::EmptyResponseError
-#      if retries < 5
-#        retry
-#      else
-#        raise
-#      end
-#    end
-  end  
     
+    if( @@server_token_cache[crowd_server_url] == nil ) 
+      
+      # first app login.. 
+      authenticate_application @configuration['application_name'], @configuration['application_password']
+      @@server_token_cache[crowd_server_url] = @server_token
+      
+    else
+      # we have a cached app token, lets see if it still works...
+      begin
+        @server_token = @@server_token_cache[crowd_server_url]
+        get_domain
+        # Yep, cached app token is still valid. no need to get a new one.
+      rescue => e
+        # token is not valid anymore.. invalidate cached entry
+        @@server_token_cache[crowd_server_url] = nil
+        @server_token = nil
+        # and ge a new token...
+        authenticate_application @configuration['application_name'], @configuration['application_password']
+        @@server_token_cache[crowd_server_url] = @server_token
+      end
+    end
+
+  end  
+  
+  def get_domain()
+    @server.getDomain(GetDomain.new(@server_token)).out
+  end
+  
   # TODO interpret errors and throw more useful exceptions Invalid Username, Invalid Password, Not Authorized, No such application etc
   # a token is returned which can be set in cookie crowd.token_key
   def authenticate_user(user_name, password, application = nil, user_agent = nil, remote_ip = nil)
